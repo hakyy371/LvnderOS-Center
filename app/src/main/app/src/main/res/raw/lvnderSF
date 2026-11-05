@@ -1,0 +1,104 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS Control Center - SurfaceFlinger Optimizer
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+    echo "[lvnderrOS] Mengaktifkan Optimasi SurfaceFlinger..."
+
+    surface=$(dumpsys SurfaceFlinger)
+
+    # Ambil refresh rate (fps) & VSYNC period
+    FPS=$(dumpsys display | grep -oE 'fps=[0-9]+' | grep -oE '[0-9]+' | sort -nr | head -n 1)
+    [ -z "$FPS" ] && FPS=60 # Jaga-jaga jika grep kosong, set ke 60
+    
+    ft=$(echo "$surface" | awk '/VSYNC period:/ {print $3; exit}')   # dalam ns
+    app_phase=$(echo "$surface" | awk '/app phase/ {print $3; exit}')
+    sf_phase=$(echo "$surface" | awk '/SF phase/ {print $3; exit}')
+
+    if [ -n "$ft" ] && [ "$ft" -gt 0 ]; then
+        # Adaptif: hitung sesuai VSYNC device
+        thresh=$(( (ft / 1000000) + (1000000000 / ft / 7) + 100 ))
+        vspan=$(( ft * 6 / 100 ))            
+        early=$(( (ft * 33 / 100) + (sf_phase / 7000000) ))
+        late=$(( (ft * 73 / 100) + (app_phase / 7000000) ))
+    else
+        # Fallback: default 60Hz
+        ft=16666667
+        thresh=145
+        vspan=$(( ft * 6 / 100 ))
+        early=$(( ft * 33 / 100 ))
+        late=$(( ft * 73 / 100 ))
+    fi
+
+    # Terapkan properti SurfaceFlinger (umum semua Hz)
+    setprop debug.sf.hwc.min.duration "$vspan"
+    setprop debug.sf.early.app.duration "$early"
+    setprop debug.sf.late.app.duration "$late"
+    setprop debug.sf.early.sf.duration "$early"
+    setprop debug.sf.late.sf.duration "$late"
+    setprop debug.sf.earlyGl.sf.duration "$early"
+    setprop debug.sf.earlyGl.app.duration "$early"
+    setprop debug.sf.set_idle_timer_ms "$thresh"
+    setprop debug.sf.phase_offset_threshold_for_next_vsync_ns "$((thresh * 1000000))"
+
+    # Extra handling kalau > 60Hz (90/120/144 Hz)
+    if [ "$FPS" -gt 60 ]; then
+        setprop debug.sf.early_phase_offset_ns "$early"
+        setprop debug.sf.early_gl_phase_offset_ns "$early"
+        setprop debug.sf.early_app_phase_offset_ns "$early"
+        setprop debug.sf.early_gl_app_phase_offset_ns "$early"
+
+        setprop debug.sf.high_fps_late_app_phase_offset_ns "$late"
+        setprop debug.sf.high_fps_late_sf_phase_offset_ns "$late"
+        setprop debug.sf.high_fps_early_phase_offset_ns "$early"
+        setprop debug.sf.high_fps_early_gl_phase_offset_ns "$early"
+        setprop debug.sf.high_fps_early_app_phase_offset_ns "$early"
+        setprop debug.sf.high_fps_early_gl_app_phase_offset_ns "$early"
+    fi
+
+    # Latency & Backpressure Tweaks
+    setprop debug.sf.latch_unsignaled 1
+    setprop debug.sf.auto_latch_unsignaled true
+    setprop debug.sf.enable_gl_backpressure false
+    setprop debug.sf.disable_backpressure 1
+
+    echo "SUKSES: SF Tuning applied for ${FPS}Hz (VSYNC=${ft}ns)"
+
+elif [ "$STATUS" = "nonaktif" ]; then
+    echo "[lvnderrOS] Mengembalikan SurfaceFlinger ke Bawaan Sistem..."
+
+    # Menghapus / mereset properti debug.sf ke bawaan sistem Android
+    setprop debug.sf.hwc.min.duration ""
+    setprop debug.sf.early.app.duration ""
+    setprop debug.sf.late.app.duration ""
+    setprop debug.sf.early.sf.duration ""
+    setprop debug.sf.late.sf.duration ""
+    setprop debug.sf.earlyGl.sf.duration ""
+    setprop debug.sf.earlyGl.app.duration ""
+    setprop debug.sf.set_idle_timer_ms ""
+    setprop debug.sf.phase_offset_threshold_for_next_vsync_ns ""
+    
+    # Reset high FPS props
+    setprop debug.sf.early_phase_offset_ns ""
+    setprop debug.sf.early_gl_phase_offset_ns ""
+    setprop debug.sf.early_app_phase_offset_ns ""
+    setprop debug.sf.early_gl_app_phase_offset_ns ""
+    setprop debug.sf.high_fps_late_app_phase_offset_ns ""
+    setprop debug.sf.high_fps_late_sf_phase_offset_ns ""
+    setprop debug.sf.high_fps_early_phase_offset_ns ""
+    setprop debug.sf.high_fps_early_gl_phase_offset_ns ""
+    setprop debug.sf.high_fps_early_app_phase_offset_ns ""
+    setprop debug.sf.high_fps_early_gl_app_phase_offset_ns ""
+
+    # Reset Latency & Backpressure
+    setprop debug.sf.latch_unsignaled 0
+    setprop debug.sf.auto_latch_unsignaled false
+    setprop debug.sf.enable_gl_backpressure true
+    setprop debug.sf.disable_backpressure 0
+
+    echo "SUKSES: SurfaceFlinger reverted to default."
+fi

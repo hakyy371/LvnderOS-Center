@@ -1,0 +1,29 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS - Speed MLBB
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+
+{
+  # 1. Kirim Notifikasi Mulai (Bypass UID 2000 agar pasti muncul)
+  su -lp 2000 -c "cmd notification post -S bigtext -t '⏳ Memproses Speed MLBB' 'lvnder_mlbb' 'Sedang mengompilasi AOT... Mohon tunggu beberapa menit.'" 2>/dev/null
+  
+  # 2. Proses Eksekusi Kompilasi AOT Murni
+  cmd package compile -m speed -f com.mobile.legends
+  
+  # 3. Kirim Notifikasi Sukses
+  su -lp 2000 -c "cmd notification post -S bigtext -t '⚡ Speed MLBB Aktif' 'lvnder_mlbb' 'Kompilasi AOT selesai! Game Mobile Legends sekarang berjalan dalam mode performa penuh.'" 2>/dev/null
+} &
+
+# Mengembalikan respons instan ke Web UI
+echo "Proses kompilasi MLBB dimulai"
+
+
+fi
+
+
+

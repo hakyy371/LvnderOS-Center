@@ -1,0 +1,198 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS - CPU
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+setprop debug.hwui.use_hint_manager true
+setprop debug.sf.enable_adpf_cpu_hint true
+
+LOCKFILE="/data/local/tmp/super_dynamic_tuner.lock"
+if [ -f "$LOCKFILE" ]; then
+    read pid < "$LOCKFILE"
+    if [ -d "/proc/$pid" ]; then
+        exit 0
+    fi
+fi
+echo $$ > "$LOCKFILE"
+
+# Cleanup lockfile on exit/kill
+trap 'rm -f "$LOCKFILE"; exit' INT TERM EXIT
+
+PROP_NAME="debug.hwui.target_cpu_time_percent"
+
+THERMAL_TARGET_C=65
+THERMAL_HARD_CUTOFF=75
+TARGET_MIN=30
+TARGET_MAX_DEFAULT=95
+TARGET_MAX_LOWBATT=55
+LOWBATT_PCT=15
+DEADBAND=2
+
+BATT_CHECK_INTERVAL=4    # only re-read battery sysfs every N loops
+RESYNC_INTERVAL=30       # only re-query the real prop every N loops
+
+# Initialize state variables
+prev_total=0
+prev_idle=0
+load_ema=5
+temp_ema_x10=400         # fixed-point: 40.0C * 10
+target_ema=60
+adaptive_interval=5
+
+batt_cap=100
+batt_status="Unknown"
+batt_check_counter=0
+
+resync_counter=0
+
+# Auto-detect thermal zone for CPU/SoC (done once, not in the loop)
+THERMAL_PATH=""
+for z in /sys/class/thermal/thermal_zone*; do
+    if [ -f "$z/type" ]; then
+        read type < "$z/type"
+        case "$type" in
+            *cpu*|*soc*|*bap*|*tsens_tz_sensor0*|*mtk_ts_AP*)
+                if [ -r "$z/temp" ]; then
+                    THERMAL_PATH="$z/temp"
+                    break
+                fi
+                ;;
+        esac
+    fi
+done
+if [ -z "$THERMAL_PATH" ]; then
+    for z in /sys/class/thermal/thermal_zone*/temp; do
+        if [ -r "$z" ]; then
+            read temp < "$z"
+            if [ "$temp" -gt 10000 ] && [ "$temp" -lt 100000 ]; then
+                THERMAL_PATH="$z"
+                break
+            fi
+        fi
+    done
+fi
+
+BATTERY_CAPACITY_PATH="/sys/class/power_supply/battery/capacity"
+BATTERY_STATUS_PATH="/sys/class/power_supply/battery/status"
+
+# One-time prop read to seed the cache (only fork in the whole script
+# outside of the rare setprop calls and the periodic resync)
+current_prop=$(getprop "$PROP_NAME" 2>/dev/null)
+case "$current_prop" in
+    ''|*[!0-9]*) current_prop=$target_ema ;;
+esac
+
+# Main optimization loop
+while true; do
+    if [ -f /proc/stat ]; then
+        read cpu user nice system idle iowait irq softirq steal guest guest_nice < /proc/stat
+        total=$((user + nice + system + idle + iowait + irq + softirq + steal))
+    else
+        sleep 5
+        continue
+    fi
+
+    if [ "$prev_total" -gt 0 ] && [ "$total" -gt "$prev_total" ]; then
+        diff_total=$((total - prev_total))
+        diff_idle=$((idle - prev_idle))
+        raw_load=$(( (100 * (diff_total - diff_idle)) / diff_total ))
+    else
+        raw_load=5
+    fi
+    prev_total=$total
+    prev_idle=$idle
+
+    load_ema=$(( (load_ema * 70 + raw_load * 30) / 100 ))
+
+    if [ -n "$THERMAL_PATH" ]; then
+        read raw_temp < "$THERMAL_PATH"
+        raw_temp=$((raw_temp / 1000))
+    else
+        raw_temp=40 
+    fi
+    
+    temp_ema_x10=$(( (temp_ema_x10 * 60 + raw_temp * 10 * 40) / 100 ))
+
+    batt_check_counter=$((batt_check_counter + 1))
+    if [ "$batt_check_counter" -ge "$BATT_CHECK_INTERVAL" ]; then
+        batt_check_counter=0
+        if [ -r "$BATTERY_CAPACITY_PATH" ]; then
+            read batt_cap < "$BATTERY_CAPACITY_PATH"
+        fi
+        if [ -r "$BATTERY_STATUS_PATH" ]; then
+            read batt_status < "$BATTERY_STATUS_PATH"
+        fi
+    fi
+
+    ceil=$TARGET_MAX_DEFAULT
+    if [ "$batt_cap" -le "$LOWBATT_PCT" ] && [ "$batt_status" != "Charging" ] && [ "$batt_status" != "Full" ]; then
+        ceil=$TARGET_MAX_LOWBATT
+    fi
+
+    if [ "$raw_temp" -ge "$THERMAL_HARD_CUTOFF" ]; then
+        target=$TARGET_MIN
+    else
+
+        headroom_x10=$(( THERMAL_TARGET_C * 10 - temp_ema_x10 ))
+        if [ "$headroom_x10" -lt 0 ]; then headroom_x10=0; fi
+        ts=$(( headroom_x10 * 100 / (THERMAL_TARGET_C * 10) ))
+
+        score=$(( (load_ema * 40 + ts * 60) / 100 ))
+
+        base=$(( 30 + (score * 65 / 100) ))
+
+        if [ "$raw_temp" -gt 60 ]; then
+            thermal_penalty=$(( (raw_temp - 60) * 3 / 2 ))
+            if [ "$thermal_penalty" -gt 25 ]; then thermal_penalty=25; fi
+        else
+            thermal_penalty=0
+        fi
+
+        target=$(( base - thermal_penalty ))
+    fi
+
+    if [ "$target" -lt "$TARGET_MIN" ]; then target=$TARGET_MIN; fi
+    if [ "$target" -gt "$ceil" ]; then target=$ceil; fi
+
+    target_ema=$(( (target_ema * 70 + target * 30) / 100 ))
+    final_target=$target_ema
+    if [ "$final_target" -lt "$TARGET_MIN" ]; then final_target=$TARGET_MIN; fi
+    if [ "$final_target" -gt "$ceil" ]; then final_target=$ceil; fi
+
+    resync_counter=$((resync_counter + 1))
+    if [ "$resync_counter" -ge "$RESYNC_INTERVAL" ]; then
+        resync_counter=0
+        synced=$(getprop "$PROP_NAME" 2>/dev/null)
+        case "$synced" in
+            ''|*[!0-9]*) : ;;
+            *) current_prop=$synced ;;
+        esac
+    fi
+
+    prop_diff=$(( final_target - current_prop ))
+    if [ "$prop_diff" -lt 0 ]; then prop_diff=$(( 0 - prop_diff )); fi
+    if [ "$prop_diff" -ge "$DEADBAND" ]; then
+        setprop "$PROP_NAME" "$final_target"
+        current_prop=$final_target
+    fi
+
+    if [ "$raw_temp" -gt 80 ]; then
+        adaptive_interval=10
+    elif [ "$raw_temp" -gt 60 ]; then
+        adaptive_interval=5
+    elif [ "$raw_load" -gt 80 ]; then
+        adaptive_interval=2
+    elif [ "$raw_load" -lt 10 ]; then
+        adaptive_interval=15
+    else
+        adaptive_interval=5
+    fi
+    if [ "$adaptive_interval" -lt 1 ]; then adaptive_interval=1; fi
+
+    sleep "$adaptive_interval"
+done
+fi

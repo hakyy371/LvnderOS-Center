@@ -1,0 +1,58 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS Control Center - Render Engine Optimizer
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+    echo "[lvnderrOS] Mengoptimalkan Mesin Grafis & Rendering..."
+
+    # 1. Force Advanced Skia Rendering Engine
+    setprop debug.renderengine.backend skiaglthreaded
+    setprop debug.hwui.renderer skiagl
+
+    # 2. Kill SurfaceFlinger Dumping Overhead
+    setprop debug.sf.dump 0
+    setprop debug.sf.dump.external false
+    setprop debug.sf.dump.primary false
+    setprop debug.sf.dump.png 0
+    setprop debug.sf.dump.enable false
+    setprop debug.sf.ddms 0
+    setprop debug.sf.sa_log 0
+    setprop debug.sf.treble_testing_override false
+    setprop debug.sf.kernel_idle_timer_update_overlay false
+    setprop debug.sf.hwc_hotplug_error_via_neg_vsync 0
+
+    # 3. Optimize Shader Cache Pre-priming
+    setprop debug.sf.prime_shader_cache.edge_extension_shader false
+    setprop debug.sf.prime_shader_cache.hole_punch false
+    setprop debug.sf.prime_shader_cache.clipped_dimmed_image_layers false
+    setprop debug.sf.prime_shader_cache.transparent_image_dimmed_layers false
+    setprop debug.sf.prime_shader_cache.solid_dimmed_layers false
+    setprop debug.sf.prime_shader_cache.shadow_layers false
+    setprop debug.sf.prime_shader_cache.image_layers false
+    setprop debug.sf.prime_shader_cache.image_dimmed_layers false
+    setprop debug.sf.prime_shader_cache.solid_layers false
+    setprop debug.sf.prime_shader_cache.clipped_layers false
+    setprop debug.sf.prime_shader_cache.pip_image_layers false
+
+    # 4. Disable Visual Indicators & Overlays (Save GPU Power)
+    setprop debug.sf.showupdates 0
+    setprop debug.sf.showcpu 0
+    setprop debug.sf.showbackground 0
+    setprop debug.sf.showfps 0
+    setprop debug.sf.show_refresh_rate_overlay_spinner 0
+    setprop debug.sf.show_refresh_rate_overlay_render_rate 0
+    setprop debug.sf.show_refresh_rate_overlay_in_middle 0
+    setprop debug.sf.gpuoverlay 0
+
+    # 5. Virtual Display Core Adjustments
+    setprop debug.sf.enable_hwc_vds false
+    setprop debug.sf.disable_hwc_vds 1
+    setprop debug.sf.show_predicted_vsync false
+    setprop debug.sf.luma_sampling 0
+
+    echo "SUKSES: Mesin render lvnderrOS telah dioptimalkan!"
+fi

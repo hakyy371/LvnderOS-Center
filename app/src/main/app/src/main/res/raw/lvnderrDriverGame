@@ -1,0 +1,12 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS - Thermal Core Only
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+
+settings put global game_driver_all_apps 1
+fi

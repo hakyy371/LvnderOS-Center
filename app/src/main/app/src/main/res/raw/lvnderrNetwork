@@ -1,0 +1,14 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS - Thermal Core Only
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+
+cmd settings put global netstats_enabled 0;cmd wifi remove-all-suggestions;cmd wifi set-ipreach-disconnect disabled;cmd wifi set-network-selection-config disabled enabled -a 0;cmd wifi set-network-selection-config enabled disabled -a 0;cmd wifi set-scan-always-available disabled;cmd wifi set-verbose-logging disabled -l 0;for a in $(cmd package list packages --user 0 network|cut -f2 -d:);do cmd activity force-stop $a&done
+
+settings put global private_dns_specifier one.one.one.one;ping -c 20 -i 0.5 one.one.one.one
+fi

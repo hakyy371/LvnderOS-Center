@@ -1,0 +1,56 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS - Thermal Core Only
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+
+device_config put interaction_jank_monitor enabled false
+device_config put interaction_jank_monitor trace_threshold_frame_time_millis -1
+device_config put activity_manager_native_boot modern_queue_enabled true
+device_config put runtime_native use_app_image_startup_cache true
+device_config put runtime_native metrics.write-to-statsd false
+device_config put runtime_native_boot disable_lock_profiling true
+device_config put runtime_native_boot enable_uffd_gc_2 true
+device_config put runtime_native_boot use_generational_gc true
+device_config put runtime_native_boot iorap_readahead_enable true
+device_config put netd_native parallel_lookup true
+device_config put netd_native sort_nameservers true
+device_config put nnapi_native telemetry_enable false
+device_config put surface_flinger_native_boot SkiaTracingFeature__use_skia_tracing false
+device_config put device_personalization_services SpeechRecognitionService__clear_logging_events_if_too_much_memory true
+device_config put activity_manager use_compaction true
+device_config put activity_manager disable_app_profiler_pss_profiling true
+device_config put content_capture log_history_size 0
+device_config put device_personalization_services Logging__enable_aiai_clearcut_logging true
+device_config put activity_manager_native_boot use_freezer true
+device_config put device_personalization_services PcsAttestationMeasurement__maximum_jitter_delay_s 30
+device_config put settings_ui event_logging_enabled false
+device_config put media media_metrics_mode 0
+device_config put runtime_native metrics.reporting-mods 0
+device_config put runtime_native metrics.reporting-mods-server 0
+device_config put runtime_native metrics.reporting-num-mods 0
+device_config put runtime_native metrics.reporting-num-mods-server 0
+device_config put activity_manager use_compaction true
+device_config put activity_manager activity_start_pss_defer 999999999999999999
+device_config put activity_manager disable_app_profiler_pss_profiling true
+device_config put activity_manager_native_boot use_freezer true
+device_config put activity_manager_native_boot modern_queue_enabled true
+device_config put runtime_native use_app_image_startup_cache true
+device_config put runtime_native_boot enable_uffd_gc_2 true
+device_config put runtime_native_boot use_generational_gc true
+device_config put runtime_native_boot disable_lock_profiling true
+device_config put settings_ui event_logging_enabled false
+device_config put content_capture log_history_size 0
+device_config put content_capture max_buffer_size 0
+device_config put window_manager system_gesture_exclusion_log_debounce_millis -1
+device_config put runtime_native metrics.write-to-statsd false
+device_config put nnapi_native telemetry_enable false
+device_config put media media_metrics_mode 0
+device_config put netd_native parallel_lookup true
+device_config put netd_native sort_nameservers true
+device_config put storage_native_boot smart_idle_maint_enabled true
+fi

@@ -1,0 +1,30 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS - Thermal Core Only
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+
+setprop db.log.slow_query_threshold 0
+setprop db.log.detailed 0
+setprop log.tag.SQLiteLog SUPPRESS
+setprop log.tag.SQLiteStatements SUPPRESS
+setprop log.tag.SQLiteTime SUPPRESS
+setprop log.tag.stats_log OFF
+setprop debug.sqlite.journalmode PERSIST
+setprop debug.sqlite.syncmode NORMAL
+setprop debug.sqlite.wal.syncmode NORMAL
+setprop debug.sqlite.journalsizelimit 1048576
+setprop debug.sqlite.wal.truncatesize 1048576
+setprop debug.sqlite.wal.poolsize 1048576
+setprop debug.sqlite.wal.autocheckpoint 500
+setprop debug.sqlite.idle_connection_timeout 30000
+setprop debug.sqlite.no_double_quoted_strs false
+setprop debug.sqlite.close_idle_connections false
+settings put --user 0 global sqlite_compatibility_wal_flags \
+legacy_compatibility_wal_enabled=false,wal_syncmode=NORMAL,truncate_size=524288
+
+fi

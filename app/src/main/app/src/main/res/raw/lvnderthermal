@@ -1,0 +1,18 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS - Thermal Core Only
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+    # Ketika toggle digeser ke kanan (ON)
+    cmd thermalservice override-status 0
+    echo "Thermal Disabled (Status 0)"
+
+elif [ "$STATUS" = "nonaktif" ]; then
+    # Ketika toggle digeser ke kiri (OFF)
+    cmd thermalservice reset
+    echo "Thermal Reset to Default"
+fi

@@ -1,0 +1,15 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS - Windows smooth
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+  
+#windows
+settings put global window_animation_scale 0.5
+settings put global transition_animation_scale 0.5
+settings put global animator_duration_scale 0.5
+fi
