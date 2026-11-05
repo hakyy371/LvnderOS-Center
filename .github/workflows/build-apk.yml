@@ -14,11 +14,12 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Gradle Actions
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build Debug APK with Gradle
-        run: gradle assembleDebug
+      - name: Generate Wrapper and Build APK
+        run: |
+          # Perintah otomatis untuk membuat file gradlew pembangun Android
+          gradle wrapper --gradle-version 8.2
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload Finished APK
         uses: actions/upload-artifact@v4
