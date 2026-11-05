@@ -1,0 +1,14 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS - App
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+cmd settings put global app_standby_constants "strong_usage_duration=43200000,notification_seen_duration=1209600000,system_interaction_duration=900000,prediction_timeout=172800000" default
+  cmd settings put global battery_saver_constants "adjust_brightness_factor=1.0,force_all_apps_standby=false,force_background_check=false,gps_mode=0,quick_doze_enabled=false,launch_boost_disabled=false" default
+  cmd settings put global device_idle_constants "inactive_to=14400000,sensing_to=0,locating_to=0,idle_after_inactive_to=0,idle_to=172800000,quick_doze_delay_to=600000,light_after_inactive_to=600000,wait_for_unlock=false" default
+  cmd settings put global job_scheduler_constants "max_job_count_active=300,bg_normal_job_count=16,bg_moderate_job_count=32,bg_low_job_count=60,min_ready_jobs_count=8" default
+fi

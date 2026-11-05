@@ -1,0 +1,141 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS Control Center - Performance Core
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+    echo "[lvnderrOS] Mengaktifkan Mode Performa Maksimal..."
+
+    # 1. Power & Performance Mode Locks
+    cmd power set-fixed-performance-mode-enabled true
+    cmd power set-adaptive-power-saver-enabled false
+    cmd settings put system HIGH_PERFORMANCE_MODE_ON 1
+    cmd settings put system PERFORMANCE_MODE_STATE 1
+    cmd settings put system POWER_PERFORMANCE_MODE_OPEN 1
+
+    # 2. Touch & Responsiveness Tuning
+    settings put secure long_press_timeout 150
+    settings put secure multi_press_timeout 100
+
+    # 3. Hardware Acceleration & SurfaceFlinger
+    setprop debug.egl.hw 1
+    setprop debug.sf.hw 1
+    setprop debug.hwui.use_buffer_age true
+    setprop debug.hwui.use_partial_updates true
+    setprop debug.hwui.skip_empty_damage true
+    setprop debug.hwui.render_dirty_regions false
+    service call SurfaceFlinger 1036 i32 0 
+
+    # 4. System Throttling & Storage Monitor Reset
+    cmd looper_stats disable
+    cmd devicestoragemonitor force-not-low
+    cmd shortcut reset-throttling --user 0
+    cmd shortcut reset-all-throttling
+
+    # 5. Continuous Background Log Killer (Aggressive CPU Saver)
+    (eval "$(seq 999|sed 's/^/logcat -c\&#/g')";logcat -G 8m;logcat -G 16m;logcat -G 32m;logcat -G 64m;logcat -G 128m;logcat -G 256m;logcat -G 512m;while true;do logcat -P "$(ps|grep ^root|awk '{print $2}'|sed 's/^/~/g')";for a in $(seq 6);do logcat -c;pkill -f logcat;sleep 10;done&sleep 1m;done)>/dev/null 2>&1&
+    
+    # 6.improve system behavior
+for a in $(cmd settings list global|grep _constants=|cut -f1 -d=);do
+  cmd settings delete global "$a"
+done
+cmd settings put global battery_stats_constants "track_cpu_active_cluster_time=false,kernel_uid_readers_throttle_time=2000,external_stats_collection_rate_limit_ms=1200000,battery_level_collection_delay_ms=600000,procstate_change_collection_delay_ms=120000,max_history_files=1,max_history_buffer_kb=512,battery_charged_delay_ms=1800000,phone_on_external_stats_collection=false,reset_while_plugged_in_minimum_duration_hours=24" default
+
+    # 7.(# stabilize connectivity
+for a in $(cmd package list packages --user 0 -U|cut -f3 -d:);do
+  cmd connectivity set-background-networking-enabled-for-uid "$a" true
+  cmd netpolicy remove restrict-background-whitelist "$a"
+  cmd netpolicy remove restrict-background-blacklist "$a"
+  cmd netpolicy remove app-idle-whitelist "$a"
+done
+for b in $(tc qdisc show|awk '{print$5}'|uniq);do
+  tc qdisc replace dev "$b" root cake||tc qdisc replace dev "$b" root fq_codel
+done
+cmd connectivity set-chain3-enabled false
+cmd wifi enable-scanning enabled
+cmd wifi force-hi-perf-mode enabled
+cmd wifi force-low-latency-mode enabled
+cmd wifi set-emergency-call-state disabled
+cmd wifi set-emergency-callback-mode disabled
+cmd wifi set-emergency-scan-request disabled
+cmd wifi set-ipreach-disconnect disabled
+cmd wifi set-passpoint-enabled disabled
+cmd wifi set-pno-scan disabled
+cmd wifi set-restricted-network-debug disabled
+cmd wifi set-scan-always-available disabled
+cmd wifi set-scan-throttling-enabled disabled
+cmd wifi set-verbose-logging disabled
+cmd wifi set-wifi-watchdog disabled
+for a in $(strings /system/framework/services.jar|grep ^debug.*tracing);do
+  setprop "$a" 0
+done
+for b in $(getprop|grep log.tag|grep -v '[0-9]'|cut -f1 -d]|tr -d '[');do
+  setprop "$b" S
+done
+atrace --async_stop
+cmd accessibility stop-trace
+cmd activity logging disable-text
+cmd autofill set log_level off
+cmd display ab-logging-disable
+cmd display dmd-logging-disable
+cmd display dwb-logging-disable
+cmd input_method tracing stop
+cmd migard dump-trace false
+cmd migard start-trace false
+cmd migard stop-trace true
+cmd migard trace-buffer-size 0
+cmd miui_step_counter_service logging-disable
+cmd statusbar tracing stop
+cmd voiceinteraction set-debug-hotword-logging false
+cmd wifi set-verbose-logging disabled -l 0
+cmd window logging disable
+cmd window logging disable-text
+cmd window logging stop
+cmd window tracing size 0
+echo 0>/sys/kernel/tracing/tracing_on
+cmd activity clear-debug-app
+cmd activity clear-exit-info --user 0
+cmd activity clear-watch-heap all
+cmd blob_store clear-all-blobs
+cmd blob_store clear-all-sessions
+cmd companiondevice remove-inactive-associations
+cmd device_policy clear-freeze-period-record
+cmd display clear-user-preferred-display-mode 0
+cmd font clear
+cmd greezer clearmonitor
+cmd location_time_zone_manager clear_recorded_provider_states
+cmd lock_settings clear
+cmd lock_settings remove-cache
+cmd media.camera clear-stream-use-case-override
+cmd media.camera watch clear
+cmd miui.downscale clear-debug-apps
+cmd miui_embedding_window clear-fixedOri
+cmd miui_embedding_window_projection clear-fixedOri
+cmd package clear-developer-verification-result
+cmd safety_center clear-data
+cmd stats clear-puller-cache
+cmd stats config remove 0
+cmd telecom cleanup-orphan-phone-accounts
+cmd telecom cleanup-stuck-calls
+cmd time_detector clear_network_time
+cmd time_detector clear_system_clock_network_time
+cmd wifi clear-user-disabled-networks
+cmd wifi remove-all-suggestions
+dumpsys media.metrics --clear
+dumpsys procstats --clear 
+
+   # 8.Logging
+   for a in --reset --disable --disable-detailed-tracking;do dumpsys binder_calls_stats $a;done
+for b in --clear --stop-testing; do dumpsys procstats $b;done
+for c in ab-logging-disable dwb-logging-disable ; do cmd display $c;done
+for procstats_option in --clear --stop-testing;do dumpsys procstats "$procstats_option";done
+
+getprop | grep '\[log.tag' | while read -r line;do prop_name=$(echo "$line" | sed -n 's/^\[\(log.tag[^]]*\)\].*/\1/p');if [ -n "$prop_name" ]; then setprop "$prop_name" "S";fi;done;getprop | grep '\[persist.log.tag' | while read -r line; do prop_name=$(echo "$line" | sed -n 's/^\[\(persist.log.tag[^]]*\)\].*/\1/p');if [ -n "$prop_name" ]; then setprop "$prop_name" "S";fi;done
+   
+   
+   
+    echo "SUKSES: Instant Performance Tweak Applied!"
+fi

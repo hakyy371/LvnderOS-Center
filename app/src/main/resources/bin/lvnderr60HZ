@@ -1,0 +1,13 @@
+#!/system/bin/sh
+# ----------------------------------------------------
+# lvnderrOS Control Center - Lock60Hz
+# Developer: hkyy
+# ----------------------------------------------------
+
+STATUS="$1"
+
+if [ "$STATUS" = "aktif" ]; then
+
+settings put system peak_refresh_rate 60.0
+settings put system min_refresh_rate 60.0
+fi
