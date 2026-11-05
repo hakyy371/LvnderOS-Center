@@ -1,0 +1,31 @@
+name: Build Shizuku Tweak APK
+on: [push]
+
+jobs:
+  android-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: |
+          # Membuat file gradlew wrapper otomatis agar server bisa mem-build proyek
+          gradle wrapper --gradle-version 8.2
+          chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload Finished APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LvnderOS-Center-Debug
+          path: app/build/outputs/apk/debug/app-debug.apk
