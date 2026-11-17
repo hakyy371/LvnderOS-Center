@@ -9,9 +9,11 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import rikka.shizuku.Shizuku;
 
 public class MainActivity extends AppCompatActivity {
@@ -24,7 +26,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // Membuat WebView layar penuh secara programmatikal
+        // Membuat WebView layar penuh secara programatikal
         webView = new WebView(this);
         setContentView(webView);
 
@@ -77,7 +79,6 @@ public class MainActivity extends AppCompatActivity {
 
         for (String file : binerFiles) {
             File targetFile = new File(binDir, file);
-            // Ekstrak ulang file untuk memastikan versi terbaru selalu terpasang
             try (InputStream is = getResources().openRawResource(
                     getResources().getIdentifier(file.toLowerCase(), "raw", getPackageName()));
                  FileOutputStream os = new FileOutputStream(targetFile)) {
@@ -87,7 +88,6 @@ public class MainActivity extends AppCompatActivity {
                 while ((read = is.read(buffer)) != -1) {
                     os.write(buffer, 0, read);
                 }
-                // Beri izin eksekusi (chmod +x) pada file biner tersebut
                 targetFile.setExecutable(true, false);
             } catch (Exception ignored) {}
         }
@@ -112,16 +112,40 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            // Arahkan jalur eksekusi ke biner privat yang sudah diekstrak di dalam aplikasi
             String jalurBiner = mContext.getFilesDir().getAbsolutePath() + "/bin/" + namaBiner;
             String perintahLengkap = "sh " + jalurBiner + " " + argumen;
 
             try {
-                // Shizuku mengeksekusi perintah biner lewat sistem ADB Shell (sh) resmi
                 Shizuku.newProcess(perintahLengkap.split(" "), null, null);
                 showToast("Tweak " + namaBiner + " berhasil dipicu!");
             } catch (Exception e) {
                 showToast("Gagal mengeksekusi biner via Shizuku!");
+            }
+        }
+
+        // === FUNGSI BARU UNTUK MEMBACA DEVICE INFO ===
+        @JavascriptInterface
+        public String getDeviceInfo() {
+            try {
+                String script = "echo \"DEVICE   : $(getprop ro.product.model)\"\n" +
+                                "echo \"BRAND    : $(getprop ro.product.brand)\"\n" +
+                                "echo \"ANDROID  : $(getprop ro.build.version.release)\"\n" +
+                                "echo \"SDK      : $(getprop ro.build.version.sdk)\"\n" +
+                                "echo \"KERNEL   : $(uname -r)\"\n" +
+                                "echo \"CHIPSET  : $(getprop ro.soc.model)\"\n" +
+                                "echo \"CPU CORE : $(nproc)\"\n" +
+                                "echo \"GPU      : $(dumpsys SurfaceFlinger | grep GLES: | cut -d, -f2)\"";
+
+                Process process = Runtime.getRuntime().exec(new String[]{"sh", "-c", script});
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                StringBuilder output = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+                return output.toString().trim();
+            } catch (Exception e) {
+                return "Gagal membaca data device: " + e.getMessage();
             }
         }
     }
